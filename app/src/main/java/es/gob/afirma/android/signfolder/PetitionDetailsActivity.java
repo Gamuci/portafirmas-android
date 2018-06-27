@@ -13,7 +13,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -22,6 +21,7 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -54,7 +54,6 @@ import es.gob.afirma.android.signfolder.DownloadFileTask.DownloadDocumentListene
 import es.gob.afirma.android.signfolder.LoadPetitionDetailsTask.LoadSignRequestDetailsListener;
 import es.gob.afirma.android.signfolder.proxy.AppConfiguration;
 import es.gob.afirma.android.signfolder.proxy.CommManager;
-import es.gob.afirma.android.signfolder.proxy.FirePreSignResult;
 import es.gob.afirma.android.signfolder.proxy.RequestDetail;
 import es.gob.afirma.android.signfolder.proxy.RequestDocument;
 import es.gob.afirma.android.signfolder.proxy.RequestResult;
@@ -123,7 +122,6 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 	/** Identificador de la firma XAdES por defecto. */
 	public static final String SIGN_FORMAT_XADES = "XAdES"; //$NON-NLS-1$
 
-	private String certB64 = null;
 	private String certAlias = null;
 
 	private RequestDetail reqDetails = null;
@@ -221,7 +219,6 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 		if (getIntent() != null && getIntent().getStringExtra(EXTRA_RESOURCE_REQUEST_ID) != null &&
 				getIntent().getStringExtra(EXTRA_RESOURCE_CERT_B64) != null &&
 				getIntent().getStringExtra(EXTRA_RESOURCE_CERT_ALIAS) != null) {
-			this.certB64 = getIntent().getStringExtra(EXTRA_RESOURCE_CERT_B64);
 			this.certAlias = getIntent().getStringExtra(EXTRA_RESOURCE_CERT_ALIAS);
 
 			if (this.reqDetails != null) {
@@ -474,8 +471,15 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 							CommManager.getProxyConnector(),
 							PetitionDetailsActivity.this,
 							PetitionDetailsActivity.this);
-			dlfTask.execute();
-			showProgressDialogDownloadFile(getString(R.string.loading_doc), dlfTask);
+			try {
+				dlfTask.execute();
+				showProgressDialogDownloadFile(getString(R.string.loading_doc), dlfTask);
+			}
+			catch (Throwable e) {
+				Toast.makeText(PetitionDetailsActivity.this.getApplicationContext(),
+						"No se ha podido ejecutar la descarga de los datos",
+						Toast.LENGTH_SHORT).show();
+			}
 		}
 
         boolean isExternalStorageWritable() {
@@ -760,7 +764,7 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 
     	private final LayoutInflater mInflater;
 
-    	public SignLineArrayAdapter(final Context context, final List<RequestDetailAdapterItem> objects) {
+    	SignLineArrayAdapter(final Context context, final List<RequestDetailAdapterItem> objects) {
     		super(context, 0, objects);
     		this.mInflater = LayoutInflater.from(context);
 		}
@@ -782,44 +786,53 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 
     	@Override
     	public int getItemViewType(final int position) {
-    		return getItem(position).getViewType();
+            RequestDetailAdapterItem item = getItem(position);
+            if (item != null) {
+                return item.getViewType();
+            }
+    		return super.getItemViewType(position);
     	}
 
     	@Override
-    	public View getView(final int position, final View convertView, final ViewGroup parent) {
-    		return getItem(position).getView(this.mInflater, convertView);
-    	}
+        public @NonNull View getView(final int position, final View convertView, final @NonNull ViewGroup parent) {
+            RequestDetailAdapterItem item = getItem(position);
+            if (item != null) {
+                return item.getView(this.mInflater, convertView);
+            }
+            return super.getView(position, convertView, parent);
+        }
     }
 
 	@Override
 	public void downloadDocumentSuccess(final File documentFile, final String filename, final String mimetype, final int docType) {
-		dismissProgressDialog();
-		if (this.tempDocuments == null) {
-			this.tempDocuments = new ArrayList<>();
-		}
 
-		// Si el fichero no es de firma, lo marcamos para borrar al cerrar la actividad y lo abrimos
-		if (docType != DownloadFileTask.DOCUMENT_TYPE_SIGN) {
-            this.tempDocuments.add(documentFile);
-			openFile(documentFile, mimetype);
-		}
-		else {
-			try {
-				runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						Toast.makeText(PetitionDetailsActivity.this, R.string.toast_msg_download_ok, Toast.LENGTH_SHORT).show();
-					}
-				});
-			} catch (final Exception e) {
-				Log.w(SFConstants.LOG_TAG, "No se pudo informar de que la firma se guardo correctamente: " + e); //$NON-NLS-1$
-				e.printStackTrace();
-			}
-		}
+            dismissProgressDialog();
+            if (this.tempDocuments == null) {
+                this.tempDocuments = new ArrayList<>();
+            }
+
+            // Si el fichero no es de firma, lo marcamos para borrar al cerrar la actividad y lo abrimos
+            if (docType != DownloadFileTask.DOCUMENT_TYPE_SIGN) {
+                this.tempDocuments.add(documentFile);
+                openFile(documentFile, mimetype);
+            } else {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                Toast.makeText(PetitionDetailsActivity.this, R.string.toast_msg_download_ok, Toast.LENGTH_SHORT).show();
+                            } catch (final Exception e) {
+                                Log.w(SFConstants.LOG_TAG, "No se pudo informar de que la firma se guardo correctamente: " + e); //$NON-NLS-1$
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+            }
 	}
 
 	@Override
 	public void downloadDocumentError() {
+
 		dismissProgressDialog();
 
 		final CustomAlertDialog dlg = CustomAlertDialog.newInstance(
@@ -834,7 +847,12 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 		runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
-				dlg.show(getSupportFragmentManager(), DIALOG_TAG);
+			    try {
+					dlg.show(getSupportFragmentManager(), DIALOG_TAG);
+				}
+				catch(Exception e) {
+			        showToastMessage("Error al mostrar el dialogo modal de error: " + e);
+                }
 			}
 		});
 	}
@@ -848,32 +866,37 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 
 		Log.i(SFConstants.LOG_TAG, "Abrimos el documento descargado con el MimeType: " + mimetype);
 
-		if (mimetype != null && mimetype.equals(PDF_MIMETYPE) ||
-				documentFile.getName().toLowerCase(Locale.US).endsWith(PDF_FILE_EXTENSION)) {
-			viewPdf(documentFile);
-		}
-		else {
-			final Intent intent = new Intent(Intent.ACTION_VIEW);
-			intent.setDataAndType(Uri.fromFile(documentFile), mimetype);
-			try {
-				this.startActivity(intent);
-			} catch (final ActivityNotFoundException e) {
+        if (mimetype != null && mimetype.equals(PDF_MIMETYPE) ||
+                documentFile.getName().toLowerCase(Locale.US).endsWith(PDF_FILE_EXTENSION)) {
+            viewPdf(documentFile);
+        } else {
 
-				Log.w(SFConstants.LOG_TAG, "No se pudo abrir el fichero guardado: " + e); //$NON-NLS-1$
-				e.printStackTrace();
+            Uri fileUri = FileProvider.getUriForFile(this, this.getApplicationContext().getPackageName(), documentFile);
 
-				final MessageDialog md = new MessageDialog();
-				md.setMessage(getString(R.string.error_file_not_support));
-				md.setTitle(getString(R.string.error_title_openning_file));
-				md.setContext(this);
-				runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						md.show(getSupportFragmentManager(), "ErrorDialog"); //$NON-NLS-1$
-					}
-				});
-			}
-		}
+            final Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(fileUri, mimetype);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            try {
+                this.startActivity(intent);
+            } catch (final ActivityNotFoundException e) {
+
+                Log.w(SFConstants.LOG_TAG, "No se pudo abrir el fichero guardado: " + e); //$NON-NLS-1$
+                e.printStackTrace();
+
+                final MessageDialog md = new MessageDialog();
+                md.setMessage(getString(R.string.error_file_not_support));
+                md.setTitle(getString(R.string.error_title_openning_file));
+                md.setContext(this);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        md.show(getSupportFragmentManager(), "ErrorDialog"); //$NON-NLS-1$
+                    }
+                });
+            }
+        }
 	}
 
 	private void viewPdf (final File file) {
@@ -881,8 +904,12 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
         final String gdrivePackage = "com.google.android.apps.viewer"; //$NON-NLS-1$
         boolean isGdriveInstalled = false;
 
+        Uri fileUri = FileProvider.getUriForFile(this, this.getApplicationContext().getPackageName(), file);
+
         final Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setDataAndType(Uri.fromFile(file), PDF_MIMETYPE);
+        intent.setDataAndType(fileUri, PDF_MIMETYPE);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
         final PackageManager pm = getApplicationContext().getPackageManager();
         final List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);
@@ -1163,7 +1190,6 @@ public final class PetitionDetailsActivity extends FragmentActivity implements L
 	 * @param message Mensaje a mostrar.
 	 */
 	void showToastMessage(final String message) {
-
 		dismissProgressDialog();
 		this.runOnUiThread(new Runnable() {
 			public void run() {

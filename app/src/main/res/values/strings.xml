@@ -1,7 +1,7 @@
 <resources>
 
     <string name="app_name">Port@firmas</string>
-    <string name="app_title">Port@firmas v1.3.2</string>
+    <string name="app_title">Port@firmas v1.3.3</string>
     <string name="close">Cerrar</string>
     <string name="error">Error</string>
     <string name="server_select">Servidores Portafirmas</string>
@@ -143,7 +143,7 @@
 
     <string name="title_activity_cert_chooser">Importar certificado</string>
     <string name="title_clave_login">Login con Clave</string>
-    <string name="file_chooser_directorio_actual">Directorio actual: %0s</string>
+    <string name="file_chooser_directorio_actual">Directorio actual: %s</string>
     <string name="file_chooser_directorio">Directorio</string>
     <string name="file_chooser_directorio_padre">Directorio padre</string>
     <string name="file_chooser_tamano_del_fichero">Tamaño: %s</string>

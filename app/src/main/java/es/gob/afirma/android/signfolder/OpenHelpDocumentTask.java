@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -132,8 +133,12 @@ final class OpenHelpDocumentTask extends AsyncTask<Void, Void, File> {
 		final String gdrivePackage = "com.google.android.apps.viewer"; //$NON-NLS-1$
 		boolean isGdriveInstalled = false;
 
+
+		Uri fileUri = FileProvider.getUriForFile(this.activity.get(), this.activity.get().getApplicationContext().getPackageName(), file);
+
 		final Intent intent = new Intent(Intent.ACTION_VIEW);
-		intent.setDataAndType(Uri.fromFile(file), PDF_MIMETYPE);
+		intent.setDataAndType(fileUri, PDF_MIMETYPE);
+		intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
 		final PackageManager pm = activity.getPackageManager();
 		final List<ResolveInfo> list = pm.queryIntentActivities(intent, 0);

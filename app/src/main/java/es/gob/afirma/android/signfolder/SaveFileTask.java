@@ -41,19 +41,19 @@ public class SaveFileTask extends AsyncTask<Void, Void, File> {
 	protected File doInBackground(final Void... arg0) {
 
 		File outFile;
-		if (this.publicFile) {
-			int i = 0;
-			// Nos aseguramos de no pisar un fichero existente
-			do {
-				outFile = new File(
-					Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-					generateFileName(this.filename, i++)
-				);
-			} while (outFile.exists());
 
-			Log.i(SFConstants.LOG_TAG, "Se intenta guardar en el directorio externo el fichero: " + outFile.getAbsolutePath()); //$NON-NLS-1$
-		}
-		else {
+        if (this.publicFile) {
+            int i = 0;
+            // Nos aseguramos de no pisar un fichero existente
+            do {
+                outFile = new File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                        generateFileName(this.filename, i++)
+                );
+            } while (outFile.exists());
+
+            Log.i(SFConstants.LOG_TAG, "Se intenta guardar en el directorio externo el fichero: " + outFile.getAbsolutePath()); //$NON-NLS-1$
+        } else {
             if (this.context != null && this.context.get() != null) {
                 Context currentContext = this.context.get();
                 outFile = new File(
@@ -61,15 +61,14 @@ public class SaveFileTask extends AsyncTask<Void, Void, File> {
                         this.filename);
 
                 Log.i(SFConstants.LOG_TAG, "Se intenta guardar de forma temporal el fichero: " + outFile); //$NON-NLS-1$
+            } else {
+                Log.w(SFConstants.LOG_TAG, "Se ha perdido el contexto y no se podra guardar el fichero en un directorio");
+                outFile = null;
             }
-			else {
-				Log.w(SFConstants.LOG_TAG, "Se ha perdido el contexto y no se podra guardar el fichero en un directorio");
-				outFile = null;
-			}
-		}
+        }
 
-		// Si se definio el fichero de salida, lo guardamos
-		if (outFile != null) {
+        // Si se definio el fichero de salida, lo guardamos
+        if (outFile != null) {
             try {
                 final FileOutputStream fos = new FileOutputStream(outFile);
                 writeData(this.dataIs, fos);
@@ -85,11 +84,11 @@ public class SaveFileTask extends AsyncTask<Void, Void, File> {
 	}
 
 	/**
-	 * Escribe los datos de un flujo de entrada en uno de salida.
-	 * @param is Flujo de entrada.
-	 * @param os Flujo de salida.
-	 * @throws IOException Cuando ocurre un error.
-	 */
+     * Escribe los datos de un flujo de entrada en uno de salida.
+     * @param is Flujo de entrada.
+     * @param os Flujo de salida.
+     * @throws IOException Cuando ocurre un error.
+     */
 	private static void writeData(final InputStream is, final OutputStream os) throws IOException {
 		int n;
 		final byte[] buffer = new byte[1024];
@@ -100,13 +99,11 @@ public class SaveFileTask extends AsyncTask<Void, Void, File> {
 
 	@Override
 	protected void onPostExecute(final File result) {
-
-		if (result == null) {
-			this.listener.saveFileError(this.filename);
-		}
-		else {
-			this.listener.saveFileSuccess(result);
-		}
+        if (result == null) {
+            this.listener.saveFileError(this.filename);
+        } else {
+            this.listener.saveFileSuccess(result);
+        }
 	}
 
 	/**
